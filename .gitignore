@@ -40,7 +40,8 @@
 # debug information files
 *.dwo
 
-# Files
+# Files and Directories
 build
 .vscode
 compile_commands.json
+.cache
