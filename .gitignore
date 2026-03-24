@@ -39,3 +39,8 @@
 
 # debug information files
 *.dwo
+
+# Files
+build
+.vscode
+compile_commands.json

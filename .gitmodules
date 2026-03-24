@@ -1,0 +1,6 @@
+[submodule "third_party/NuRaft"]
+	path = third_party/NuRaft
+	url = https://github.com/eBay/NuRaft
+[submodule "third_party/Crow"]
+	path = third_party/Crow
+	url = https://github.com/CrowCpp/Crow
