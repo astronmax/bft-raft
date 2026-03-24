@@ -4,3 +4,6 @@
 [submodule "third_party/Crow"]
 	path = third_party/Crow
 	url = https://github.com/CrowCpp/Crow
+[submodule "third_party/cpr"]
+	path = third_party/cpr
+	url = https://github.com/libcpr/cpr
