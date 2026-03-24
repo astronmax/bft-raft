@@ -14,3 +14,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE NuRaft::static_lib)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/Crow)
 target_link_libraries(${PROJECT_NAME} PRIVATE Crow::Crow)
+
+add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/cpr)
+target_link_libraries(${PROJECT_NAME} PRIVATE cpr::cpr)
+
+find_package(Boost 1.83.0 REQUIRED COMPONENTS program_options)
+target_link_libraries(${PROJECT_NAME} PRIVATE Boost::program_options)

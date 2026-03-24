@@ -4,46 +4,32 @@
 
 #include <libnuraft/nuraft.hxx>
 #include <crow.h>
+#include <boost/program_options.hpp>
 
-#include <fstream>
-
+namespace po = boost::program_options;
 using namespace nuraft;
 
 int main(int argc, char* argv[]) {
-    if (argc < 3) {
-        std::cout << "Usage: ./bft-raft <ID> <RPC PORT> <HTTP PORT>" << std::endl;
+    po::options_description desc {"Allowed options"};
+    desc.add_options()
+        ("id", po::value<int>()->required(), "Raft server ID")
+        ("rpc_port", po::value<int>()->required(), "Raft server RPC port")
+        ("http_port", po::value<int>()->required(), "Server HTTP port for REST API");
+    
+    po::variables_map vm;
+
+    try {
+        po::store(po::parse_command_line(argc, argv, desc), vm);
+        po::notify(vm);
+    } catch (const po::error& e) {
+        std::cout << desc << std::endl;
         return 0;
     }
 
-    auto server_id = std::atoi(argv[1]);
-    auto server_rpc_port = std::atoi(argv[2]);
-    auto server_http_port = std::atoi(argv[3]);
+    auto srv_state_mgr = cs_new<inmem_state_mgr>(vm["id"].as<int>(), "localhost:" + std::to_string(vm["rpc_port"].as<int>()));
 
     auto srv_state_machine = cs_new<bft_raft::bft_state_machine>();
-    auto srv_state_mgr = cs_new<inmem_state_mgr>(server_id, "localhost:" + std::string(argv[2]));
-
-    std::ifstream cluster_config_file("cluster_config.json");
-    if (!cluster_config_file.is_open()) {
-        std::cerr << "Can't open cluster_config.json" << std::endl;
-        return 1;
-    }
-
-    std::string json_str((std::istreambuf_iterator<char>(cluster_config_file)), 
-                          std::istreambuf_iterator<char>());
-    cluster_config_file.close();
-
-    auto json_data = crow::json::load(json_str);
-    if (!json_data) {
-        std::cerr << "JSON error" << std::endl;
-        return 1;
-    }
-
-    cluster_config cluster_cfg {};
-    for (const auto& node : json_data) {
-        cluster_cfg.get_servers().push_back(cs_new<srv_config>(node["id"].i(), node["rpc_ep"].s()));
-        srv_state_machine->add_http_endpoint(node["id"].i(), node["http_ep"].s());
-    }
-    srv_state_mgr->save_config(cluster_cfg);
+    srv_state_machine->add_http_endpoint(vm["id"].as<int>(), "localhost:" + std::to_string(vm["http_port"].as<int>()));
 
     asio_service::options asio_opt {};
     raft_params params {};
@@ -57,7 +43,7 @@ int main(int argc, char* argv[]) {
         srv_state_machine,
         srv_state_mgr,
         cs_new<logger>(),
-        server_rpc_port,
+        vm["rpc_port"].as<int>(),
         asio_opt,
         params
     );
@@ -66,7 +52,7 @@ int main(int argc, char* argv[]) {
         std::this_thread::sleep_for( std::chrono::milliseconds(100) );
     }
 
-    bft_raft::request_handler handler {server_http_port, server, srv_state_machine};
+    bft_raft::request_handler handler {vm["http_port"].as<int>(), server, srv_state_machine};
     handler.run();
 
     return 0;

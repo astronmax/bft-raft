@@ -29,7 +29,7 @@ public:
 
     get_leader_resp get_leader();
     response_status append_data(const std::string& msg);
-    response_status register_new_node();
+    response_status register_node(const int id, const std::string& rpc_ep, const std::string& http_ep);
 
     void run();
 

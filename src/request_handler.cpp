@@ -1,6 +1,7 @@
 #include "request_handler.hpp"
+#include "crow/common.h"
 #include "crow/json.h"
-#include "libnuraft/async.hxx"
+#include "libnuraft/srv_config.hxx"
 
 using namespace bft_raft;
 using namespace nuraft;
@@ -39,6 +40,19 @@ request_handler::request_handler(int port, ptr<raft_server> raft_srv, std::share
         resp["status"] = get_response_status{}[this->append_data(body_string)];
         return crow::response(resp);
     });
+
+    CROW_ROUTE(_app, "/register_node").methods(crow::HTTPMethod::POST)
+    ([this](const crow::request& req) {
+        auto body_json = crow::json::load(req.body);
+        auto status = this->register_node(
+            body_json["id"].i(),
+            body_json["rpc_ep"].s(),
+            body_json["http_ep"].s()
+        );
+        crow::json::wvalue resp;
+        resp["status"] = get_response_status{}[status];
+        return crow::response(resp);
+    });
 }
 
 get_leader_resp request_handler::get_leader() {
@@ -58,7 +72,11 @@ response_status request_handler::append_data(const std::string& msg) {
     return response_status::OK;
 }
 
-response_status request_handler::register_new_node() {
+response_status request_handler::register_node(const int id, const std::string& rpc_ep, const std::string& http_ep) {
+    srv_config cfg {id, rpc_ep};
+    _raft_server->add_srv(cfg);
+    _state_machine->add_http_endpoint(id, http_ep);
+
     return response_status::OK;
 }
 
