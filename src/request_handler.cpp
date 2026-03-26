@@ -51,6 +51,11 @@ request_handler::request_handler(int port, ptr<raft_server> raft_srv, std::share
         );
         crow::json::wvalue resp;
         resp["status"] = get_response_status{}[status];
+        crow::json::wvalue& http_eps = resp["http_endpoints"];
+        for (const auto& [key, value] : _state_machine->get_http_endpoints()) {
+            http_eps[std::to_string(key)] = value;
+        }
+
         return crow::response(resp);
     });
 }

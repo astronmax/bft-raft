@@ -82,3 +82,7 @@ void bft_state_machine::add_http_endpoint(int id, std::string ep) {
 std::string bft_state_machine::get_http_endpoint(int id) {
     return _http_endpoints.at(id);
 }
+
+std::unordered_map<int, std::string> bft_state_machine::get_http_endpoints() {
+    return _http_endpoints;
+}

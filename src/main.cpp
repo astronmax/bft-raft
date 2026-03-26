@@ -1,15 +1,11 @@
-#include "cpr/api.h"
-#include "cpr/cprtypes.h"
-#include "cpr/parameters.h"
-#include "cpr/response.h"
 #include "in_memory_state_mgr.hxx"
 #include "bft_state_machine.hpp"
 #include "request_handler.hpp"
 
 #include <libnuraft/nuraft.hxx>
 #include <crow.h>
-#include <cpr/cpr.h>
 #include <boost/program_options.hpp>
+#include <cpr/cpr.h>
 
 namespace po = boost::program_options;
 using namespace nuraft;
@@ -18,8 +14,8 @@ int main(int argc, char* argv[]) {
     po::options_description desc {"Allowed options"};
     desc.add_options()
         ("id", po::value<int>()->required(), "Raft server ID")
-        ("rpc_port", po::value<int>()->required(), "Raft server RPC port")
-        ("http_port", po::value<int>()->required(), "Server HTTP port for REST API")
+        ("rpc-port", po::value<int>()->required(), "Raft server RPC port")
+        ("http-port", po::value<int>()->required(), "Server HTTP port for REST API")
         ("connect", po::value<std::string>(), "HTTP endpoint used to connect to the cluster");
     
     po::variables_map vm;
@@ -32,10 +28,14 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    auto srv_state_mgr = cs_new<inmem_state_mgr>(vm["id"].as<int>(), "localhost:" + std::to_string(vm["rpc_port"].as<int>()));
+    auto server_id = vm["id"].as<int>();
+    auto server_rpc_ep = "localhost:" + std::to_string(vm["rpc-port"].as<int>());
+    auto server_http_ep = "localhost:" + std::to_string(vm["http-port"].as<int>());
+
+    auto srv_state_mgr = cs_new<inmem_state_mgr>(server_id, server_rpc_ep);
 
     auto srv_state_machine = cs_new<bft_raft::bft_state_machine>();
-    srv_state_machine->add_http_endpoint(vm["id"].as<int>(), "localhost:" + std::to_string(vm["http_port"].as<int>()));
+    srv_state_machine->add_http_endpoint(server_id, server_http_ep);
 
     asio_service::options asio_opt {};
     raft_params params {};
@@ -49,7 +49,7 @@ int main(int argc, char* argv[]) {
         srv_state_machine,
         srv_state_mgr,
         cs_new<logger>(),
-        vm["rpc_port"].as<int>(),
+        vm["rpc-port"].as<int>(),
         asio_opt,
         params
     );
@@ -60,14 +60,28 @@ int main(int argc, char* argv[]) {
 
     if (vm.contains("connect")) {
         auto node_addr = vm["connect"].as<std::string>();
-        std::cout << "[+] Using " << node_addr << " to connect to cluster" << std::endl;
         auto response = cpr::Get(cpr::Url{"http://" + node_addr + "/get_leader"});
         auto resp_json = crow::json::load(response.text);
-        std::string leader_ep = resp_json["http_ep"].s();
-        std::cout << "[+] Get cluster leader: " << leader_ep << std::endl;
+        std::string leader_addr = resp_json["http_ep"].s();
+        
+        crow::json::wvalue req;
+        req["id"] = server_id;
+        req["rpc_ep"] = server_rpc_ep;
+        req["http_ep"] = server_http_ep;
+
+        response = cpr::Post(
+            cpr::Url{"http://" + leader_addr + "/register_node"},
+            cpr::Header{{"Content-Type", "application/json"}},
+            cpr::Body{req.dump()}
+        );
+        auto response_json = crow::json::load(response.text);
+        auto new_http_endpoints = response_json["http_endpoints"];
+        for (const auto& kv : new_http_endpoints) {
+            srv_state_machine->add_http_endpoint(std::stoi(kv.key()), kv.s());
+        }
     }
 
-    bft_raft::request_handler handler {vm["http_port"].as<int>(), server, srv_state_machine};
+    bft_raft::request_handler handler {vm["http-port"].as<int>(), server, srv_state_machine};
     handler.run();
 
     return 0;

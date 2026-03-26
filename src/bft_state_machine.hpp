@@ -22,6 +22,7 @@ public:
     
     void add_http_endpoint(int id, std::string ep);
     std::string get_http_endpoint(int id);
+    std::unordered_map<int, std::string> get_http_endpoints();
 
 private:
     std::atomic<uint64_t> _last_committed_idx;
