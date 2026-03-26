@@ -1,9 +1,14 @@
+#include "cpr/api.h"
+#include "cpr/cprtypes.h"
+#include "cpr/parameters.h"
+#include "cpr/response.h"
 #include "in_memory_state_mgr.hxx"
 #include "bft_state_machine.hpp"
 #include "request_handler.hpp"
 
 #include <libnuraft/nuraft.hxx>
 #include <crow.h>
+#include <cpr/cpr.h>
 #include <boost/program_options.hpp>
 
 namespace po = boost::program_options;
@@ -14,7 +19,8 @@ int main(int argc, char* argv[]) {
     desc.add_options()
         ("id", po::value<int>()->required(), "Raft server ID")
         ("rpc_port", po::value<int>()->required(), "Raft server RPC port")
-        ("http_port", po::value<int>()->required(), "Server HTTP port for REST API");
+        ("http_port", po::value<int>()->required(), "Server HTTP port for REST API")
+        ("connect", po::value<std::string>(), "HTTP endpoint used to connect to the cluster");
     
     po::variables_map vm;
 
@@ -50,6 +56,15 @@ int main(int argc, char* argv[]) {
 
     while (!server->is_initialized()) {
         std::this_thread::sleep_for( std::chrono::milliseconds(100) );
+    }
+
+    if (vm.contains("connect")) {
+        auto node_addr = vm["connect"].as<std::string>();
+        std::cout << "[+] Using " << node_addr << " to connect to cluster" << std::endl;
+        auto response = cpr::Get(cpr::Url{"http://" + node_addr + "/get_leader"});
+        auto resp_json = crow::json::load(response.text);
+        std::string leader_ep = resp_json["http_ep"].s();
+        std::cout << "[+] Get cluster leader: " << leader_ep << std::endl;
     }
 
     bft_raft::request_handler handler {vm["http_port"].as<int>(), server, srv_state_machine};
