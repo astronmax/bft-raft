@@ -1,5 +1,6 @@
 #include "request_handler.hpp"
 #include "crow/common.h"
+#include "crow/http_response.h"
 #include "crow/json.h"
 #include "libnuraft/srv_config.hxx"
 
@@ -10,6 +11,7 @@ struct get_response_status {
     static constexpr std::string operator[](response_status status) noexcept {
         switch (status) {
         case response_status::OK: return "OK";
+        case response_status::NOT_ALLOWED: return "NOT ALLOWED";
         case response_status::ERROR: return "ERROR";
         }
         return "";
@@ -35,28 +37,39 @@ request_handler::request_handler(int port, ptr<raft_server> raft_srv, std::share
 
     CROW_ROUTE(_app, "/append_data").methods(crow::HTTPMethod::POST)
     ([this](const crow::request& req) {
-        auto body_string = req.body;
         crow::json::wvalue resp;
-        resp["status"] = get_response_status{}[this->append_data(body_string)];
-        return crow::response(resp);
+        if (this->_raft_server->is_leader()) {
+            auto body_string = req.body;
+            resp["status"] = get_response_status{}[this->append_data(body_string)];
+            return crow::response(resp);
+        } else {
+            resp["status"] = get_response_status{}[response_status::NOT_ALLOWED];
+            return crow::response(resp);
+        }
     });
 
     CROW_ROUTE(_app, "/register_node").methods(crow::HTTPMethod::POST)
     ([this](const crow::request& req) {
-        auto body_json = crow::json::load(req.body);
-        auto status = this->register_node(
-            body_json["id"].i(),
-            body_json["rpc_ep"].s(),
-            body_json["http_ep"].s()
-        );
         crow::json::wvalue resp;
-        resp["status"] = get_response_status{}[status];
-        crow::json::wvalue& http_eps = resp["http_endpoints"];
-        for (const auto& [key, value] : _state_machine->get_http_endpoints()) {
-            http_eps[std::to_string(key)] = value;
-        }
+        if (this->_raft_server->is_leader()) {
+            auto body_json = crow::json::load(req.body);
+            auto status = this->register_node(
+                body_json["id"].i(),
+                body_json["rpc_ep"].s(),
+                body_json["http_ep"].s()
+            );
 
-        return crow::response(resp);
+            resp["status"] = get_response_status{}[status];
+            crow::json::wvalue& http_eps = resp["http_endpoints"];
+            for (const auto& [key, value] : _state_machine->get_http_endpoints()) {
+                http_eps[std::to_string(key)] = value;
+            }
+
+            return crow::response(resp);
+        } else {
+            resp["status"] = get_response_status{}[response_status::NOT_ALLOWED];
+            return crow::response(resp);
+        }
     });
 }
 

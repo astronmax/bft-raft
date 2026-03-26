@@ -11,6 +11,7 @@ namespace bft_raft {
 
 enum class response_status {
     OK,
+    NOT_ALLOWED,
     ERROR,
 };
 
