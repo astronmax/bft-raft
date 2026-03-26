@@ -1,5 +1,6 @@
 #include "in_memory_state_mgr.hxx"
 #include "bft_state_machine.hpp"
+#include "libnuraft/cluster_config.hxx"
 #include "request_handler.hpp"
 
 #include <libnuraft/nuraft.hxx>
@@ -16,7 +17,8 @@ int main(int argc, char* argv[]) {
         ("id", po::value<int>()->required(), "Raft server ID")
         ("rpc-port", po::value<int>()->required(), "Raft server RPC port")
         ("http-port", po::value<int>()->required(), "Server HTTP port for REST API")
-        ("connect", po::value<std::string>(), "HTTP endpoint used to connect to the cluster");
+        ("connect", po::value<std::string>(), "HTTP endpoint used to connect to the cluster")
+        ("whitelist", po::value<std::string>(), "JSON file with seed nodes");
     
     po::variables_map vm;
 
@@ -36,6 +38,22 @@ int main(int argc, char* argv[]) {
 
     auto srv_state_machine = cs_new<bft_raft::bft_state_machine>();
     srv_state_machine->add_http_endpoint(server_id, server_http_ep);
+
+    if (vm.contains("whitelist")) {
+        std::ifstream file(vm["whitelist"].as<std::string>());
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string json_str = buffer.str();
+        auto json = crow::json::load(json_str);
+
+        cluster_config cluster_cfg;
+        for (const auto& ep : json) {
+            auto server_cfg = cs_new<srv_config>(int32_t(ep["id"].i()), ep["rpc_ep"].s());
+            cluster_cfg.get_servers().push_back(server_cfg);
+            srv_state_machine->add_http_endpoint(int32_t(ep["id"].i()), ep["http_ep"].s());
+        }
+        srv_state_mgr->save_config(cluster_cfg);
+    }
 
     asio_service::options asio_opt {};
     raft_params params {};

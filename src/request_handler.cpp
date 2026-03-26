@@ -79,6 +79,7 @@ response_status request_handler::append_data(const std::string& msg) {
 
 response_status request_handler::register_node(const int id, const std::string& rpc_ep, const std::string& http_ep) {
     srv_config cfg {id, rpc_ep};
+    cfg.set_priority(0);
     _raft_server->add_srv(cfg);
     _state_machine->add_http_endpoint(id, http_ep);
 

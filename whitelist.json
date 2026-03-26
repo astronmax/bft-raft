@@ -1,0 +1,4 @@
+[
+    {"id": 1, "rpc_ep": "localhost:12345", "http_ep": "localhost:8080"},
+    {"id": 2, "rpc_ep": "localhost:12346", "http_ep": "localhost:8081"}
+]
