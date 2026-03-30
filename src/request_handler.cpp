@@ -7,17 +7,6 @@
 using namespace bft_raft;
 using namespace nuraft;
 
-struct get_response_status {
-    static constexpr std::string operator[](response_status status) noexcept {
-        switch (status) {
-        case response_status::OK: return "OK";
-        case response_status::NOT_ALLOWED: return "NOT ALLOWED";
-        case response_status::ERROR: return "ERROR";
-        }
-        return "";
-    }
-};
-
 request_handler::request_handler(int port, ptr<raft_server> raft_srv, std::shared_ptr<bft_state_machine> state_machine)
     : _port(port)
     , _raft_server(raft_srv)
@@ -39,8 +28,11 @@ request_handler::request_handler(int port, ptr<raft_server> raft_srv, std::share
     ([this](const crow::request& req) {
         crow::json::wvalue resp;
         if (this->_raft_server->is_leader()) {
-            auto body_string = req.body;
-            resp["status"] = get_response_status{}[this->append_data(body_string)];
+            crow::json::wvalue req_json;
+            req_json["type"] = get_leader_request_type{}[leader_request_type::DATA];
+            req_json["data"] = crow::json::load(req.body);
+
+            resp["status"] = get_response_status{}[this->append_data(req_json.dump())];
             return crow::response(resp);
         } else {
             resp["status"] = get_response_status{}[response_status::NOT_ALLOWED];
@@ -92,11 +84,14 @@ response_status request_handler::append_data(const std::string& msg) {
 
 response_status request_handler::register_node(const int id, const std::string& rpc_ep, const std::string& http_ep) {
     srv_config cfg {id, rpc_ep};
-    cfg.set_priority(0);
     _raft_server->add_srv(cfg);
     _state_machine->add_http_endpoint(id, http_ep);
 
-    return response_status::OK;
+    crow::json::wvalue req;
+    req["type"] = get_leader_request_type{}[leader_request_type::ADD];
+    req["node_id"] = id;
+    req["node_http_ep"] = http_ep;
+    return this->append_data(req.dump());
 }
 
 void request_handler::run() {

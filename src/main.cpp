@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
         ("rpc-port", po::value<int>()->required(), "Raft server RPC port")
         ("http-port", po::value<int>()->required(), "Server HTTP port for REST API")
         ("connect", po::value<std::string>(), "HTTP endpoint used to connect to the cluster")
-        ("whitelist", po::value<std::string>(), "JSON file with seed nodes");
+        ("config", po::value<std::string>(), "JSON file with seed nodes");
     
     po::variables_map vm;
 
@@ -39,8 +39,8 @@ int main(int argc, char* argv[]) {
     auto srv_state_machine = cs_new<bft_raft::bft_state_machine>();
     srv_state_machine->add_http_endpoint(server_id, server_http_ep);
 
-    if (vm.contains("whitelist")) {
-        std::ifstream file(vm["whitelist"].as<std::string>());
+    if (vm.contains("config")) {
+        std::ifstream file(vm["config"].as<std::string>());
         std::stringstream buffer;
         buffer << file.rdbuf();
         std::string json_str = buffer.str();

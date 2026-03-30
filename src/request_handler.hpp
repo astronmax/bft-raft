@@ -15,6 +15,32 @@ enum class response_status {
     ERROR,
 };
 
+struct get_response_status {
+    static constexpr std::string operator[](response_status status) noexcept {
+        switch (status) {
+        case response_status::OK: return "OK";
+        case response_status::NOT_ALLOWED: return "NOT ALLOWED";
+        case response_status::ERROR: return "ERROR";
+        }
+        return "";
+    }
+};
+
+enum class leader_request_type {
+    ADD,
+    DATA,
+};
+
+struct get_leader_request_type {
+    static constexpr std::string operator[](leader_request_type type) noexcept {
+        switch (type) {
+        case leader_request_type::ADD: return "ADD";
+        case leader_request_type::DATA: return "DATA";
+        }
+        return "";
+    }
+};
+
 struct get_leader_resp {
     int id;
     std::string rpc_endpoint;

@@ -1,4 +1,8 @@
 #include "bft_state_machine.hpp"
+#include "request_handler.hpp"
+#include "crow/json.h"
+
+#include <crow/json.h>
 
 #include <iostream>
 
@@ -14,8 +18,7 @@ ptr<buffer> bft_state_machine::pre_commit(const ulong log_idx, buffer& data) {
     buffer_serializer bs(data);
     std::string str = bs.get_str();
 
-    std::cout << "pre_commit " << log_idx << ": "
-                << str << std::endl;
+    std::cout << "pre_commit " << log_idx << ": " << str << std::endl;
     return nullptr;
 }
 
@@ -23,8 +26,14 @@ ptr<buffer> bft_state_machine::commit(const ulong log_idx, buffer& data) {
     buffer_serializer bs(data);
     std::string str = bs.get_str();
 
-    std::cout << "commit " << log_idx << ": "
-                << str << std::endl;
+    auto leader_req = crow::json::load(str);
+    if (leader_req["type"] == get_leader_request_type{}[leader_request_type::ADD]) {
+        auto node_id = leader_req["node_id"].i();
+        auto node_http_ep = leader_req["node_http_ep"].s();
+        this->add_http_endpoint(node_id, node_http_ep);
+    }
+
+    std::cout << "commit " << log_idx << ": " << str << std::endl;
 
     _last_committed_idx = log_idx;
     return nullptr;
