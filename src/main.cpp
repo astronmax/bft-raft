@@ -5,42 +5,38 @@
 
 #include <libnuraft/nuraft.hxx>
 #include <crow.h>
-#include <boost/program_options.hpp>
 #include <cpr/cpr.h>
+#include <CLI/CLI.hpp>
 
-namespace po = boost::program_options;
 using namespace nuraft;
 
 int main(int argc, char* argv[]) {
-    po::options_description desc {"Allowed options"};
-    desc.add_options()
-        ("id", po::value<int>()->required(), "Raft server ID")
-        ("rpc-port", po::value<int>()->required(), "Raft server RPC port")
-        ("http-port", po::value<int>()->required(), "Server HTTP port for REST API")
-        ("connect", po::value<std::string>(), "HTTP endpoint used to connect to the cluster")
-        ("config", po::value<std::string>(), "JSON file with seed nodes");
-    
-    po::variables_map vm;
+    CLI::App app;
 
-    try {
-        po::store(po::parse_command_line(argc, argv, desc), vm);
-        po::notify(vm);
-    } catch (const po::error& e) {
-        std::cout << desc << std::endl;
-        return 0;
-    }
+    int server_id {};
+    int rpc_port {};
+    int http_port {};
+    std::string connection_str {};
+    std::string config_path {};
 
-    auto server_id = vm["id"].as<int>();
-    auto server_rpc_ep = "localhost:" + std::to_string(vm["rpc-port"].as<int>());
-    auto server_http_ep = "localhost:" + std::to_string(vm["http-port"].as<int>());
+    app.add_option("--id", server_id, "Raft server identifier")->required(true);
+    app.add_option("--rpc-port", rpc_port, "Raft server RPC port")->required(true);
+    app.add_option("--http-port", http_port, "Server HTTP port for REST API")->required(true);
+    app.add_option("--connect", connection_str, "HTTP endpoint from cluster");
+    app.add_option("--config", config_path, "JSON file with seed nodes");
+
+    CLI11_PARSE(app, argc, argv);
+
+    auto server_rpc_ep = "localhost:" + std::to_string(rpc_port);
+    auto server_http_ep = "localhost:" + std::to_string(http_port);
 
     auto srv_state_mgr = cs_new<inmem_state_mgr>(server_id, server_rpc_ep);
 
     auto srv_state_machine = cs_new<bft_raft::bft_state_machine>();
     srv_state_machine->add_http_endpoint(server_id, server_http_ep);
 
-    if (vm.contains("config")) {
-        std::ifstream file(vm["config"].as<std::string>());
+    if (!config_path.empty()) {
+        std::ifstream file(config_path);
         std::stringstream buffer;
         buffer << file.rdbuf();
         std::string json_str = buffer.str();
@@ -67,7 +63,7 @@ int main(int argc, char* argv[]) {
         srv_state_machine,
         srv_state_mgr,
         cs_new<logger>(),
-        vm["rpc-port"].as<int>(),
+        rpc_port,
         asio_opt,
         params
     );
@@ -76,9 +72,8 @@ int main(int argc, char* argv[]) {
         std::this_thread::sleep_for( std::chrono::milliseconds(100) );
     }
 
-    if (vm.contains("connect")) {
-        auto node_addr = vm["connect"].as<std::string>();
-        auto response = cpr::Get(cpr::Url{"http://" + node_addr + "/get_leader"});
+    if (!connection_str.empty()) {
+        auto response = cpr::Get(cpr::Url{"http://" + connection_str + "/get_leader"});
         auto resp_json = crow::json::load(response.text);
         std::string leader_addr = resp_json["http_ep"].s();
         
@@ -99,7 +94,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    bft_raft::request_handler handler {vm["http-port"].as<int>(), server, srv_state_machine};
+    bft_raft::request_handler handler {http_port, server, srv_state_machine};
     handler.run();
 
     return 0;

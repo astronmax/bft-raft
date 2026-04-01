@@ -7,3 +7,6 @@
 [submodule "third_party/cpr"]
 	path = third_party/cpr
 	url = https://github.com/libcpr/cpr
+[submodule "third_party/CLI11"]
+	path = third_party/CLI11
+	url = https://github.com/CLIUtils/CLI11
