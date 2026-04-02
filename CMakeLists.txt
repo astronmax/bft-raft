@@ -22,3 +22,5 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/CLI11)
 target_link_libraries(${PROJECT_NAME} PRIVATE CLI11::CLI11)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE cryptopp)
+
+add_subdirectory(${CMAKE_SOURCE_DIR}/test)

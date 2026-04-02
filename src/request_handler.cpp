@@ -28,11 +28,9 @@ request_handler::request_handler(int port, ptr<raft_server> raft_srv, std::share
     ([this](const crow::request& req) {
         crow::json::wvalue resp;
         if (this->_raft_server->is_leader()) {
-            crow::json::wvalue req_json;
-            req_json["type"] = get_leader_request_type{}[leader_request_type::DATA];
-            req_json["data"] = crow::json::load(req.body);
-
-            resp["status"] = get_response_status{}[this->append_data(req_json.dump())];
+            crow::json::wvalue cluster_req = crow::json::load(req.body);
+            cluster_req["type"] = get_leader_request_type{}[leader_request_type::DATA];
+            resp["status"] = get_response_status{}[this->append_data(cluster_req.dump())];
             return crow::response(resp);
         } else {
             resp["status"] = get_response_status{}[response_status::NOT_ALLOWED];
@@ -88,7 +86,7 @@ response_status request_handler::register_node(const int id, const std::string& 
     _state_machine->add_http_endpoint(id, http_ep);
 
     crow::json::wvalue req;
-    req["type"] = get_leader_request_type{}[leader_request_type::ADD];
+    req["type"] = get_leader_request_type{}[leader_request_type::REGISTER_NODE];
     req["node_id"] = id;
     req["node_http_ep"] = http_ep;
     return this->append_data(req.dump());

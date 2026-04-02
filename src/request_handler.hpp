@@ -27,14 +27,14 @@ struct get_response_status {
 };
 
 enum class leader_request_type {
-    ADD,
+    REGISTER_NODE,
     DATA,
 };
 
 struct get_leader_request_type {
     static constexpr std::string operator[](leader_request_type type) noexcept {
         switch (type) {
-        case leader_request_type::ADD: return "ADD";
+        case leader_request_type::REGISTER_NODE: return "REGISTER_NODE";
         case leader_request_type::DATA: return "DATA";
         }
         return "";

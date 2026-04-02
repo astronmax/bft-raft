@@ -27,7 +27,7 @@ ptr<buffer> bft_state_machine::commit(const ulong log_idx, buffer& data) {
     std::string str = bs.get_str();
 
     auto leader_req = crow::json::load(str);
-    if (leader_req["type"] == get_leader_request_type{}[leader_request_type::ADD]) {
+    if (leader_req["type"] == get_leader_request_type{}[leader_request_type::REGISTER_NODE]) {
         auto node_id = leader_req["node_id"].i();
         auto node_http_ep = leader_req["node_http_ep"].s();
         this->add_http_endpoint(node_id, node_http_ep);
