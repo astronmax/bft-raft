@@ -1,8 +1,14 @@
 #include "bft_state_machine.hpp"
 #include "request_handler.hpp"
-#include "crow/json.h"
 
 #include <crow/json.h>
+#include <crypto++/filters.h>
+#include <crypto++/secblock.h>
+#include <cryptopp/rsa.h>
+#include <cryptopp/sha.h>
+#include <cryptopp/osrng.h>
+#include <cryptopp/files.h>
+#include <cryptopp/base64.h>
 
 #include <iostream>
 
@@ -31,9 +37,16 @@ ptr<buffer> bft_state_machine::commit(const ulong log_idx, buffer& data) {
         auto node_id = leader_req["node_id"].i();
         auto node_http_ep = leader_req["node_http_ep"].s();
         this->add_http_endpoint(node_id, node_http_ep);
-    }
+    } else if (leader_req["type"] == get_leader_request_type{}[leader_request_type::DATA]) {
+        auto signature_b64 = leader_req["signature"].s();
+        auto pubkey_b64 = leader_req["pubkey"].s();
+        auto msg = leader_req["data"].s();
 
-    std::cout << "commit " << log_idx << ": " << str << std::endl;
+        std::cout << "CHECK: " << this->check_message(msg, signature_b64, pubkey_b64) << std::endl;
+        std::cout << "DATA: " << msg << std::endl;
+    } else {
+        std::cout << "commit " << log_idx << ": " << str << std::endl;
+    }
 
     _last_committed_idx = log_idx;
     return nullptr;
@@ -94,4 +107,30 @@ std::string bft_state_machine::get_http_endpoint(int id) {
 
 std::unordered_map<int, std::string> bft_state_machine::get_http_endpoints() {
     return _http_endpoints;
+}
+
+bool bft_state_machine::check_message(const std::string& msg,
+                       const std::string& signature_b64,
+                       const std::string& pubkey_b64) const {
+    std::string binaryKey;
+    CryptoPP::StringSource ss(pubkey_b64, true,
+        new CryptoPP::Base64Decoder(new CryptoPP::StringSink(binaryKey))
+    );
+    CryptoPP::ByteQueue queue;
+    queue.Put((const byte*)binaryKey.data(), binaryKey.size());
+
+    CryptoPP::RSA::PublicKey publicKey;
+    publicKey.BERDecodePublicKey(queue, false, 0);
+
+    std::string decodedSignature;
+    CryptoPP::StringSource ss2(signature_b64, true,
+        new CryptoPP::Base64Decoder(
+            new CryptoPP::StringSink(decodedSignature)
+        )
+    );
+
+    CryptoPP::RSASS<CryptoPP::PKCS1v15, CryptoPP::SHA256>::Verifier verifier(publicKey);
+    return verifier.VerifyMessage(
+        (const CryptoPP::byte*) msg.data(), msg.size(),
+        (const CryptoPP::byte*) decodedSignature.data(), decodedSignature.size());
 }

@@ -25,6 +25,11 @@ public:
     std::unordered_map<int, std::string> get_http_endpoints();
 
 private:
+    bool check_message(const std::string& msg,
+                       const std::string& signature_b64,
+                       const std::string& pubkey_b64) const;
+
+private:
     std::atomic<uint64_t> _last_committed_idx;
     nuraft::ptr<nuraft::snapshot> _last_snapshot;
     std::mutex _last_snapshot_lock;
